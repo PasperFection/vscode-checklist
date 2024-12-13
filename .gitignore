@@ -1,0 +1,53 @@
+# Dependencies
+node_modules/
+package-lock.json
+yarn.lock
+
+# Build output
+out/
+dist/
+*.vsix
+
+# TypeScript
+*.js
+*.js.map
+*.d.ts
+!src/**/*.d.ts
+
+# Test coverage
+coverage/
+.nyc_output/
+
+# IDE specific files
+.vscode/*
+!.vscode/settings.json
+!.vscode/tasks.json
+!.vscode/launch.json
+!.vscode/extensions.json
+.idea/
+*.swp
+*.swo
+.DS_Store
+Thumbs.db
+
+# Environment files
+.env
+.env.local
+.env.*.local
+
+# Logs
+logs/
+*.log
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+
+# Backup files
+*.bak
+*.backup
+*~
+
+# Extension specific
+.implementation-checklist/
+.analytics/
+.backups/
