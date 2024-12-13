@@ -196,6 +196,83 @@ class ChecklistProvider implements vscode.TreeDataProvider<ChecklistItem> {
         this.items.sort(compare);
         this.refresh();
     }
+
+    async scanWorkspace(): Promise<void> {
+        try {
+            // Alle ondersteunde bestandspatronen verzamelen
+            const patterns = Object.values(FILE_PATTERNS).flat();
+            
+            // Bestanden zoeken met de patterns
+            const files = await vscode.workspace.findFiles(
+                `{${patterns.join(',')}}`,
+                `{${EXCLUDE_PATTERNS.join(',')}}`
+            );
+            
+            for (const file of files) {
+                const document = await vscode.workspace.openTextDocument(file);
+                const text = document.getText();
+                
+                // Regex patterns voor verschillende items
+                const patterns = {
+                    todos: /\/\/\s*(TODO|FIXME):.+/g,
+                    functions: /(?:function)\s+(\w+)/g,
+                    classes: /class\s+(\w+)/g,
+                    interfaces: /interface\s+(\w+)/g
+                };
+                
+                const matches = {
+                    todos: text.match(patterns.todos) || [],
+                    functions: text.match(patterns.functions) || [],
+                    classes: text.match(patterns.classes) || [],
+                    interfaces: text.match(patterns.interfaces) || []
+                };
+                
+                if (Object.values(matches).some(arr => arr.length > 0)) {
+                    const fileItem = new ChecklistItem(path.basename(file.fsPath), []);
+                    fileItem.contextValue = 'file';
+                    fileItem.tooltip = file.fsPath;
+                    
+                    // TODO's toevoegen
+                    matches.todos.forEach(todo => {
+                        const todoItem = new ChecklistItem(
+                            todo.replace(/\/\/\s*(TODO|FIXME):/, '').trim()
+                        );
+                        todoItem.contextValue = 'todo';
+                        fileItem.children.push(todoItem);
+                    });
+                    
+                    // Functies toevoegen
+                    matches.functions.forEach(func => {
+                        const funcName = func.split(' ')[1];
+                        const funcItem = new ChecklistItem(`Implement ${funcName}`);
+                        funcItem.contextValue = 'function';
+                        fileItem.children.push(funcItem);
+                    });
+                    
+                    // Classes toevoegen
+                    matches.classes.forEach(cls => {
+                        const className = cls.split(' ')[1];
+                        const classItem = new ChecklistItem(`Implement ${className}`);
+                        classItem.contextValue = 'class';
+                        fileItem.children.push(classItem);
+                    });
+                    
+                    // Interfaces toevoegen
+                    matches.interfaces.forEach(intf => {
+                        const intfName = intf.split(' ')[1];
+                        const intfItem = new ChecklistItem(`Implement ${intfName}`);
+                        intfItem.contextValue = 'interface';
+                        fileItem.children.push(intfItem);
+                    });
+                    
+                    this.addItem(fileItem);
+                }
+            }
+        } catch (error) {
+            console.error('Error scanning workspace:', error);
+            vscode.window.showErrorMessage('Error scanning workspace: ' + (error as Error).message);
+        }
+    }
 }
 
 class ChecklistItem extends vscode.TreeItem implements IChecklistItem {
@@ -288,90 +365,6 @@ class ChecklistItem extends vscode.TreeItem implements IChecklistItem {
     }
 }
 
-async function scanWorkspace(): Promise<ChecklistItem[]> {
-    const checklistItems: ChecklistItem[] = [];
-    
-    try {
-        // Alle ondersteunde bestandspatronen verzamelen
-        const patterns = Object.values(FILE_PATTERNS).flat();
-        
-        // Bestanden zoeken met de patterns
-        const files = await vscode.workspace.findFiles(
-            `{${patterns.join(',')}}`,
-            `{${EXCLUDE_PATTERNS.join(',')}}`
-        );
-        
-        for (const file of files) {
-            const document = await vscode.workspace.openTextDocument(file);
-            const text = document.getText();
-            
-            // Regex patterns voor verschillende items
-            const patterns = {
-                todos: /\/\/\s*(TODO|FIXME):.+/g,
-                functions: /(?:function)\s+(\w+)/g,
-                classes: /class\s+(\w+)/g,
-                interfaces: /interface\s+(\w+)/g
-            };
-            
-            const matches = {
-                todos: text.match(patterns.todos) || [],
-                functions: text.match(patterns.functions) || [],
-                classes: text.match(patterns.classes) || [],
-                interfaces: text.match(patterns.interfaces) || []
-            };
-            
-            if (Object.values(matches).some(arr => arr.length > 0)) {
-                const fileItem = new ChecklistItem(path.basename(file.fsPath), []);
-                fileItem.contextValue = 'file';
-                fileItem.tooltip = file.fsPath;
-                
-                // TODO's toevoegen
-                matches.todos.forEach(todo => {
-                    const todoItem = new ChecklistItem(
-                        todo.replace(/\/\/\s*(TODO|FIXME):/, '').trim()
-                    );
-                    todoItem.contextValue = 'todo';
-                    fileItem.children.push(todoItem);
-                });
-                
-                // Functies toevoegen
-                matches.functions.forEach(func => {
-                    const funcName = func.split(' ')[1];
-                    const funcItem = new ChecklistItem(`Implement ${funcName}`);
-                    funcItem.contextValue = 'function';
-                    fileItem.children.push(funcItem);
-                });
-                
-                // Classes toevoegen
-                matches.classes.forEach(cls => {
-                    const className = cls.split(' ')[1];
-                    const classItem = new ChecklistItem(`Implement ${className}`);
-                    classItem.contextValue = 'class';
-                    fileItem.children.push(classItem);
-                });
-                
-                // Interfaces toevoegen
-                matches.interfaces.forEach(intf => {
-                    const intfName = intf.split(' ')[1];
-                    const intfItem = new ChecklistItem(`Implement ${intfName}`);
-                    intfItem.contextValue = 'interface';
-                    fileItem.children.push(intfItem);
-                });
-                
-                checklistItems.push(fileItem);
-            }
-        }
-    } catch (error) {
-        console.error('Error scanning workspace:', error);
-        vscode.window.showErrorMessage('Error scanning workspace: ' + (error as Error).message);
-    }
-    
-    return checklistItems;
-}
-
-let statusBarItem: vscode.StatusBarItem;
-let checklistItems: any[] = [];
-
 export async function activate(context: vscode.ExtensionContext): Promise<void> {
     try {
         // Initialize providers
@@ -391,6 +384,7 @@ export async function activate(context: vscode.ExtensionContext): Promise<void> 
         });
 
         // Create status bar
+        let statusBarItem: vscode.StatusBarItem;
         statusBarItem = vscode.window.createStatusBarItem(vscode.StatusBarAlignment.Left);
         statusBarItem.text = "$(checklist) Implementation Checklist";
         statusBarItem.command = 'implementation-checklist.showMenu';
@@ -398,40 +392,8 @@ export async function activate(context: vscode.ExtensionContext): Promise<void> 
 
         // Register commands
         const commands = [
-            vscode.commands.registerCommand('implementation-checklist.scanWorkspace', async () => {
-                try {
-                    await vscode.window.withProgress({
-                        location: vscode.ProgressLocation.Notification,
-                        title: "Scanning workspace...",
-                        cancellable: true
-                    }, async (progress, token) => {
-                        progress.report({ increment: 0 });
-                        
-                        // Clear existing items
-                        checklistProvider.clearItems();
-                        
-                        // Scan workspace
-                        const items = await scanWorkspace();
-                        
-                        // Add items to the tree
-                        items.forEach(item => checklistProvider.addItem(item));
-                        
-                        progress.report({ increment: 100 });
-                        
-                        // Track event
-                        analyticsProvider.trackEvent('workspace.scan');
-                        
-                        notificationProvider.showNotification(
-                            `Scan complete: Found ${items.length} items`,
-                            'info'
-                        );
-                    });
-                } catch (error) {
-                    notificationProvider.showNotification(
-                        'Failed to scan workspace: ' + (error instanceof Error ? error.message : 'Unknown error'),
-                        'error'
-                    );
-                }
+            vscode.commands.registerCommand('implementation-checklist.scanWorkspace', () => {
+                checklistProvider.scanWorkspace();
             }),
             
             vscode.commands.registerCommand('implementation-checklist.refreshView', () => {

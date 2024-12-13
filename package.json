@@ -2,7 +2,7 @@
     "name": "vscode-checklist",
     "displayName": "Implementation Checklist",
     "description": "A powerful checklist extension for tracking implementation tasks with priorities, due dates, and team collaboration",
-    "version": "1.6.3",
+    "version": "1.8.0",
     "publisher": "pasperfection",
     "engines": {
         "vscode": "^1.60.0"
