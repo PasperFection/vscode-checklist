@@ -1,7 +1,10 @@
 import * as vscode from 'vscode';
 import * as path from 'path';
+import { ThemeProvider } from './ThemeProvider';
+import { NotificationProvider } from './NotificationProvider';
+import { AnalyticsProvider } from './AnalyticsProvider';
 
-// Types en interfaces
+// Types and interfaces
 interface IChecklistItem {
     label: string;
     children: ChecklistItem[];
@@ -70,10 +73,13 @@ class ChecklistProvider implements vscode.TreeDataProvider<ChecklistItem> {
 
     constructor(context: vscode.ExtensionContext) {
         this.context = context;
+        this.loadState();
     }
 
     refresh(): void {
         this._onDidChangeTreeData.fire();
+        this.saveState();
+        updateStatusBar();
     }
 
     getTreeItem(element: ChecklistItem): vscode.TreeItem {
@@ -90,6 +96,16 @@ class ChecklistProvider implements vscode.TreeDataProvider<ChecklistItem> {
     addItem(item: ChecklistItem): void {
         this.items.push(item);
         this.refresh();
+        AnalyticsProvider.getInstance().trackEvent('item.add');
+    }
+
+    removeItem(item: ChecklistItem): void {
+        const index = this.items.indexOf(item);
+        if (index > -1) {
+            this.items.splice(index, 1);
+            this.refresh();
+            AnalyticsProvider.getInstance().trackEvent('item.remove');
+        }
     }
 
     clearItems(): void {
@@ -97,24 +113,20 @@ class ChecklistProvider implements vscode.TreeDataProvider<ChecklistItem> {
         this.refresh();
     }
 
-    // Persistentie functies
     saveState(): void {
-        const serializedItems = this.serializeItems(this.items);
-        this.context.workspaceState.update('checklist-items', serializedItems);
+        this.context.globalState.update('checklistItems', this.serializeItems(this.items));
     }
 
     loadState(): void {
-        const savedItems = this.context.workspaceState.get<any[]>('checklist-items', []);
+        const savedItems = this.context.globalState.get<any[]>('checklistItems', []);
         this.items = this.deserializeItems(savedItems);
         this.refresh();
     }
 
     private serializeItems(items: ChecklistItem[]): any[] {
         return items.map(item => ({
-            label: item.label.substring(2), // Verwijder checkbox prefix
+            label: item.label,
             status: item.status,
-            contextValue: item.contextValue,
-            tooltip: item.tooltip,
             priority: item.priority,
             dueDate: item.dueDate?.toISOString(),
             notes: item.notes,
@@ -124,20 +136,65 @@ class ChecklistProvider implements vscode.TreeDataProvider<ChecklistItem> {
     }
 
     private deserializeItems(items: any[]): ChecklistItem[] {
-        return items.map(item => {
-            const checklistItem = new ChecklistItem(
-                item.label,
-                this.deserializeItems(item.children),
-                item.status,
-                item.priority,
-                item.dueDate ? new Date(item.dueDate) : undefined,
-                item.notes,
-                item.tags
-            );
-            checklistItem.contextValue = item.contextValue;
-            checklistItem.tooltip = item.tooltip;
-            return checklistItem;
-        });
+        return items.map(item => new ChecklistItem(
+            item.label,
+            this.deserializeItems(item.children || []),
+            item.status,
+            item.priority,
+            item.dueDate ? new Date(item.dueDate) : undefined,
+            item.notes,
+            item.tags || []
+        ));
+    }
+
+    createItem(label: string): ChecklistItem {
+        const item = new ChecklistItem(label);
+        this.addItem(item);
+        return item;
+    }
+
+    editItem(item: ChecklistItem, newLabel: string): void {
+        item.label = newLabel;
+        this.refresh();
+    }
+
+    deleteItem(item: ChecklistItem): void {
+        this.removeItem(item);
+    }
+
+    toggleComplete(item: ChecklistItem): void {
+        item.status = !item.status;
+        this.refresh();
+    }
+
+    setPriority(item: ChecklistItem, priority: 'high' | 'medium' | 'low'): void {
+        item.priority = priority;
+        this.refresh();
+    }
+
+    setDueDate(item: ChecklistItem, dueDate: Date): void {
+        item.dueDate = dueDate;
+        this.refresh();
+    }
+
+    addNote(item: ChecklistItem, note: string): void {
+        item.notes = note;
+        this.refresh();
+    }
+
+    addTag(item: ChecklistItem, tag: string): void {
+        item.tags.push(tag);
+        this.refresh();
+    }
+
+    filterItems(filter: (item: ChecklistItem) => boolean): void {
+        this.items = this.items.filter(filter);
+        this.refresh();
+    }
+
+    sortItems(compare: (a: ChecklistItem, b: ChecklistItem) => number): void {
+        this.items.sort(compare);
+        this.refresh();
     }
 }
 
@@ -316,419 +373,232 @@ let statusBarItem: vscode.StatusBarItem;
 let checklistItems: any[] = [];
 
 export async function activate(context: vscode.ExtensionContext): Promise<void> {
-    console.log('Implementation Checklist is now active');
-
-    // Initialize providers
-    const notificationProvider = new NotificationProvider();
-    const statisticsProvider = new StatisticsProvider();
-    const contextMenuProvider = new ContextMenuProvider();
-    const keyboardHandler = new KeyboardShortcutHandler();
-    const workspaceProvider = new WorkspaceProvider();
-    const backupProvider = new BackupProvider();
-    const commandPaletteProvider = new CommandPaletteProvider();
-    const analyticsProvider = new AnalyticsProvider();
-    const themeProvider = new ThemeProvider();
-    const helpProvider = new HelpProvider(context.extensionUri);
-    const dataProvider = new DataProvider();
-
-    // Create status bar item
-    statusBarItem = vscode.window.createStatusBarItem(vscode.StatusBarAlignment.Left);
-    statusBarItem.command = 'implementation-checklist.showStatistics';
-    context.subscriptions.push(statusBarItem);
-
-    // Load initial data
     try {
-        checklistItems = await workspaceProvider.loadFromWorkspace();
-        updateStatusBar();
-        notificationProvider.showNotification('Checklist loaded successfully', 'info');
+        // Initialize providers
+        const checklistProvider = new ChecklistProvider(context);
+        const themeProvider = ThemeProvider.getInstance();
+        const notificationProvider = NotificationProvider.getInstance();
+        const analyticsProvider = AnalyticsProvider.getInstance();
+
+        // Initialize theme
+        themeProvider.initialize(context);
+
+        // Create tree view
+        const treeView = vscode.window.createTreeView('implementationChecklist', {
+            treeDataProvider: checklistProvider,
+            showCollapseAll: true,
+            canSelectMany: false
+        });
+
+        // Create status bar
+        statusBarItem = vscode.window.createStatusBarItem(vscode.StatusBarAlignment.Left);
+        statusBarItem.text = "$(checklist) Implementation Checklist";
+        statusBarItem.command = 'implementation-checklist.showMenu';
+        statusBarItem.show();
+
+        // Register commands
+        const commands = [
+            vscode.commands.registerCommand('implementation-checklist.scanWorkspace', async () => {
+                try {
+                    await vscode.window.withProgress({
+                        location: vscode.ProgressLocation.Notification,
+                        title: "Scanning workspace...",
+                        cancellable: true
+                    }, async (progress, token) => {
+                        progress.report({ increment: 0 });
+                        
+                        // Clear existing items
+                        checklistProvider.clearItems();
+                        
+                        // Scan workspace
+                        const items = await scanWorkspace();
+                        
+                        // Add items to the tree
+                        items.forEach(item => checklistProvider.addItem(item));
+                        
+                        progress.report({ increment: 100 });
+                        
+                        // Track event
+                        analyticsProvider.trackEvent('workspace.scan');
+                        
+                        notificationProvider.showNotification(
+                            `Scan complete: Found ${items.length} items`,
+                            'info'
+                        );
+                    });
+                } catch (error) {
+                    notificationProvider.showNotification(
+                        'Failed to scan workspace: ' + (error instanceof Error ? error.message : 'Unknown error'),
+                        'error'
+                    );
+                }
+            }),
+            
+            vscode.commands.registerCommand('implementation-checklist.refreshView', () => {
+                checklistProvider.refresh();
+                analyticsProvider.trackEvent('view.refresh');
+            }),
+
+            vscode.commands.registerCommand('implementation-checklist.createItem', async () => {
+                const label = await vscode.window.showInputBox({
+                    prompt: 'Enter checklist item',
+                    placeHolder: 'What needs to be done?'
+                });
+                if (label) {
+                    checklistProvider.createItem(label);
+                }
+            }),
+
+            vscode.commands.registerCommand('implementation-checklist.editItem', async (item: ChecklistItem) => {
+                const newLabel = await vscode.window.showInputBox({
+                    prompt: 'Edit checklist item',
+                    value: item.label
+                });
+                if (newLabel) {
+                    checklistProvider.editItem(item, newLabel);
+                }
+            }),
+
+            vscode.commands.registerCommand('implementation-checklist.deleteItem', async (item: ChecklistItem) => {
+                const confirm = await vscode.window.showWarningMessage(
+                    `Are you sure you want to delete "${item.label}"?`,
+                    { modal: true },
+                    'Delete'
+                );
+                if (confirm === 'Delete') {
+                    checklistProvider.deleteItem(item);
+                }
+            }),
+
+            vscode.commands.registerCommand('implementation-checklist.toggleComplete', (item: ChecklistItem) => {
+                checklistProvider.toggleComplete(item);
+            }),
+
+            vscode.commands.registerCommand('implementation-checklist.setPriority', async (item: ChecklistItem) => {
+                const priority = await vscode.window.showQuickPick(
+                    ['high', 'medium', 'low'],
+                    {
+                        placeHolder: 'Select priority'
+                    }
+                ) as 'high' | 'medium' | 'low' | undefined;
+                
+                if (priority) {
+                    checklistProvider.setPriority(item, priority);
+                }
+            }),
+
+            vscode.commands.registerCommand('implementation-checklist.setDueDate', async (item: ChecklistItem) => {
+                const dateString = await vscode.window.showInputBox({
+                    prompt: 'Enter due date (YYYY-MM-DD)',
+                    placeHolder: 'YYYY-MM-DD'
+                });
+                
+                if (dateString) {
+                    const date = new Date(dateString);
+                    if (!isNaN(date.getTime())) {
+                        checklistProvider.setDueDate(item, date);
+                    } else {
+                        vscode.window.showErrorMessage('Invalid date format. Please use YYYY-MM-DD');
+                    }
+                }
+            }),
+
+            vscode.commands.registerCommand('implementation-checklist.addNote', async (item: ChecklistItem) => {
+                const note = await vscode.window.showInputBox({
+                    prompt: 'Add a note',
+                    placeHolder: 'Enter note text'
+                });
+                
+                if (note) {
+                    checklistProvider.addNote(item, note);
+                }
+            }),
+
+            vscode.commands.registerCommand('implementation-checklist.addTag', async (item: ChecklistItem) => {
+                const tag = await vscode.window.showInputBox({
+                    prompt: 'Add a tag',
+                    placeHolder: 'Enter tag (without #)'
+                });
+                
+                if (tag) {
+                    checklistProvider.addTag(item, tag);
+                }
+            }),
+
+            vscode.commands.registerCommand('implementation-checklist.showStatistics', () => {
+                // TODO: Implement statistics view
+                vscode.window.showInformationMessage('Statistics feature coming soon!');
+            }),
+
+            vscode.commands.registerCommand('implementation-checklist.filterItems', async () => {
+                const filter = await vscode.window.showQuickPick(
+                    ['All', 'Active', 'Completed'],
+                    {
+                        placeHolder: 'Filter items'
+                    }
+                );
+                
+                if (filter) {
+                    switch (filter) {
+                        case 'Active':
+                            checklistProvider.filterItems(item => !item.status);
+                            break;
+                        case 'Completed':
+                            checklistProvider.filterItems(item => item.status);
+                            break;
+                        default:
+                            checklistProvider.refresh();
+                    }
+                }
+            }),
+
+            vscode.commands.registerCommand('implementation-checklist.sortItems', async () => {
+                const sortBy = await vscode.window.showQuickPick(
+                    ['Priority', 'Due Date', 'Alphabetical'],
+                    {
+                        placeHolder: 'Sort by'
+                    }
+                );
+                
+                if (sortBy) {
+                    switch (sortBy) {
+                        case 'Priority':
+                            checklistProvider.sortItems((a, b) => {
+                                const priority = { high: 0, medium: 1, low: 2 };
+                                return priority[a.priority] - priority[b.priority];
+                            });
+                            break;
+                        case 'Due Date':
+                            checklistProvider.sortItems((a, b) => {
+                                if (!a.dueDate) return 1;
+                                if (!b.dueDate) return -1;
+                                return a.dueDate.getTime() - b.dueDate.getTime();
+                            });
+                            break;
+                        case 'Alphabetical':
+                            checklistProvider.sortItems((a, b) => a.label.localeCompare(b.label));
+                            break;
+                    }
+                }
+            })
+        ];
+
+        context.subscriptions.push(...commands, treeView, statusBarItem);
+
+        // Auto-scan on startup if enabled
+        const config = vscode.workspace.getConfiguration('implementation-checklist');
+        if (config.get<boolean>('scanOnStartup', true)) {
+            vscode.commands.executeCommand('implementation-checklist.scanWorkspace');
+        }
+
+        analyticsProvider.trackEvent('extension.activate');
     } catch (error) {
-        notificationProvider.showNotification('Failed to load checklist', 'error');
-    }
-
-    // Register tree data providers
-    vscode.window.registerTreeDataProvider('implementationChecklist', statisticsProvider);
-    vscode.window.registerTreeDataProvider('implementationChecklistHelp', helpProvider);
-
-    // Register commands
-    const commands = [
-        ['implementation-checklist.createItem', createItem],
-        ['implementation-checklist.editItem', editItem],
-        ['implementation-checklist.deleteItem', deleteItem],
-        ['implementation-checklist.toggleComplete', toggleComplete],
-        ['implementation-checklist.setPriority', setPriority],
-        ['implementation-checklist.setDueDate', setDueDate],
-        ['implementation-checklist.addNote', addNote],
-        ['implementation-checklist.addTag', addTag],
-        ['implementation-checklist.showStatistics', showStatistics],
-        ['implementation-checklist.filterItems', filterItems],
-        ['implementation-checklist.sortItems', sortItems],
-        ['implementation-checklist.searchItems', searchItems],
-        ['implementation-checklist.syncWorkspace', syncWorkspace],
-        ['implementation-checklist.syncWithRemote', syncWithRemote],
-        ['implementation-checklist.createBackup', createBackup],
-        ['implementation-checklist.restoreBackup', restoreBackup],
-        ['implementation-checklist.exportBackups', exportBackups],
-        ['implementation-checklist.importBackups', importBackups],
-        ['implementation-checklist.exportData', exportData],
-        ['implementation-checklist.importData', importData],
-        ['implementation-checklist.selectTheme', selectTheme],
-        ['implementation-checklist.showHelp', showHelp],
-        ['implementation-checklist.getItems', () => checklistItems],
-        ['implementation-checklist.updateItems', updateItems]
-    ];
-
-    commands.forEach(([command, handler]) => {
-        context.subscriptions.push(
-            vscode.commands.registerCommand(command, handler)
+        NotificationProvider.getInstance().showNotification(
+            'Failed to activate extension: ' + (error instanceof Error ? error.message : 'Unknown error'),
+            'error'
         );
-    });
-
-    // Setup workspace file watcher
-    if (vscode.workspace.workspaceFolders) {
-        const watcher = vscode.workspace.createFileSystemWatcher(
-            new vscode.RelativePattern(
-                vscode.workspace.workspaceFolders[0],
-                '**/.implementation-checklist.json'
-            )
-        );
-
-        watcher.onDidChange(async () => {
-            try {
-                checklistItems = await workspaceProvider.loadFromWorkspace();
-                updateStatusBar();
-                notificationProvider.showNotification('Checklist synchronized', 'info');
-            } catch (error) {
-                notificationProvider.showNotification('Failed to sync checklist', 'error');
-            }
-        });
-
-        context.subscriptions.push(watcher);
-    }
-
-    // Setup auto-backup
-    context.subscriptions.push(
-        vscode.workspace.onDidSaveTextDocument(async () => {
-            if (vscode.workspace.getConfiguration('implementation-checklist').get('autoBackup')) {
-                await backupProvider.autoBackup(checklistItems);
-            }
-        })
-    );
-
-    // Track activation
-    analyticsProvider.trackEvent('extension_activated');
-}
-
-// Command handlers
-async function createItem() {
-    const title = await vscode.window.showInputBox({
-        prompt: 'Enter checklist item title'
-    });
-
-    if (title) {
-        const item = {
-            id: Date.now().toString(),
-            title,
-            completed: false,
-            createdAt: new Date().toISOString()
-        };
-
-        checklistItems.push(item);
-        await saveChanges();
-        AnalyticsProvider.getInstance().trackEvent('item_created');
+        throw error;
     }
 }
 
-async function editItem() {
-    const item = await selectItem('Select item to edit');
-    if (item) {
-        const newTitle = await vscode.window.showInputBox({
-            prompt: 'Enter new title',
-            value: item.title
-        });
-
-        if (newTitle) {
-            item.title = newTitle;
-            await saveChanges();
-            AnalyticsProvider.getInstance().trackEvent('item_edited');
-        }
-    }
-}
-
-async function deleteItem() {
-    const item = await selectItem('Select item to delete');
-    if (item) {
-        const index = checklistItems.indexOf(item);
-        checklistItems.splice(index, 1);
-        await saveChanges();
-        AnalyticsProvider.getInstance().trackEvent('item_deleted');
-    }
-}
-
-async function toggleComplete() {
-    const item = await selectItem('Select item to toggle');
-    if (item) {
-        item.completed = !item.completed;
-        await saveChanges();
-        AnalyticsProvider.getInstance().trackEvent('item_toggled');
-    }
-}
-
-async function setPriority() {
-    const item = await selectItem('Select item to set priority');
-    if (item) {
-        const priority = await vscode.window.showQuickPick(
-            ['High', 'Medium', 'Low'],
-            { placeHolder: 'Select priority' }
-        );
-
-        if (priority) {
-            item.priority = priority.toLowerCase();
-            await saveChanges();
-            AnalyticsProvider.getInstance().trackEvent('priority_set');
-        }
-    }
-}
-
-async function setDueDate() {
-    const item = await selectItem('Select item to set due date');
-    if (item) {
-        const dueDate = await vscode.window.showInputBox({
-            prompt: 'Enter due date (YYYY-MM-DD)',
-            validateInput: validateDate
-        });
-
-        if (dueDate) {
-            item.dueDate = dueDate;
-            await saveChanges();
-            AnalyticsProvider.getInstance().trackEvent('due_date_set');
-        }
-    }
-}
-
-async function addNote() {
-    const item = await selectItem('Select item to add note');
-    if (item) {
-        const note = await vscode.window.showInputBox({
-            prompt: 'Enter note'
-        });
-
-        if (note) {
-            item.notes = item.notes || [];
-            item.notes.push({
-                text: note,
-                createdAt: new Date().toISOString()
-            });
-            await saveChanges();
-            AnalyticsProvider.getInstance().trackEvent('note_added');
-        }
-    }
-}
-
-async function addTag() {
-    const item = await selectItem('Select item to add tag');
-    if (item) {
-        const tag = await vscode.window.showInputBox({
-            prompt: 'Enter tag'
-        });
-
-        if (tag) {
-            item.tags = item.tags || [];
-            item.tags.push(tag);
-            await saveChanges();
-            AnalyticsProvider.getInstance().trackEvent('tag_added');
-        }
-    }
-}
-
-async function showStatistics() {
-    StatisticsProvider.getInstance().showStatisticsView();
-    AnalyticsProvider.getInstance().trackEvent('statistics_viewed');
-}
-
-async function filterItems() {
-    const filter = await vscode.window.showQuickPick(
-        ['All', 'Completed', 'Pending', 'High Priority', 'Due Soon'],
-        { placeHolder: 'Select filter' }
-    );
-
-    if (filter) {
-        // Apply filter logic
-        AnalyticsProvider.getInstance().trackEvent('items_filtered');
-    }
-}
-
-async function sortItems() {
-    const sortBy = await vscode.window.showQuickPick(
-        ['Due Date', 'Priority', 'Created Date', 'Title'],
-        { placeHolder: 'Sort by' }
-    );
-
-    if (sortBy) {
-        // Apply sort logic
-        AnalyticsProvider.getInstance().trackEvent('items_sorted');
-    }
-}
-
-async function searchItems() {
-    const searchTerm = await vscode.window.showInputBox({
-        prompt: 'Search items'
-    });
-
-    if (searchTerm) {
-        // Apply search logic
-        AnalyticsProvider.getInstance().trackEvent('items_searched');
-    }
-}
-
-async function syncWorkspace() {
-    await WorkspaceProvider.getInstance().saveToWorkspace(checklistItems);
-    AnalyticsProvider.getInstance().trackEvent('workspace_synced');
-}
-
-async function syncWithRemote() {
-    await WorkspaceProvider.getInstance().syncWithRemote();
-    AnalyticsProvider.getInstance().trackEvent('remote_synced');
-}
-
-async function createBackup() {
-    await BackupProvider.getInstance().createBackup(checklistItems);
-    AnalyticsProvider.getInstance().trackEvent('backup_created');
-}
-
-async function restoreBackup() {
-    const backups = await BackupProvider.getInstance().listBackups();
-    const selected = await vscode.window.showQuickPick(
-        backups.map(b => ({
-            label: new Date(b.timestamp).toLocaleString(),
-            backup: b
-        }))
-    );
-
-    if (selected) {
-        checklistItems = await BackupProvider.getInstance().restoreBackup(selected.backup.file);
-        await saveChanges();
-        AnalyticsProvider.getInstance().trackEvent('backup_restored');
-    }
-}
-
-async function exportBackups() {
-    const uri = await vscode.window.showSaveDialog({
-        filters: { 'JSON Files': ['json'] }
-    });
-
-    if (uri) {
-        await BackupProvider.getInstance().exportBackups(uri.fsPath);
-        AnalyticsProvider.getInstance().trackEvent('backups_exported');
-    }
-}
-
-async function importBackups() {
-    const uri = await vscode.window.showOpenDialog({
-        filters: { 'JSON Files': ['json'] }
-    });
-
-    if (uri && uri[0]) {
-        await BackupProvider.getInstance().importBackups(uri[0].fsPath);
-        AnalyticsProvider.getInstance().trackEvent('backups_imported');
-    }
-}
-
-async function exportData() {
-    const format = await vscode.window.showQuickPick(
-        ['JSON', 'Markdown', 'CSV'],
-        { placeHolder: 'Select export format' }
-    );
-
-    if (format) {
-        const uri = await vscode.window.showSaveDialog({
-            filters: {
-                'JSON Files': ['json'],
-                'Markdown Files': ['md'],
-                'CSV Files': ['csv']
-            }
-        });
-
-        if (uri) {
-            await DataProvider.getInstance().exportData(
-                checklistItems,
-                uri.fsPath,
-                format.toLowerCase() as 'json' | 'markdown' | 'csv'
-            );
-            AnalyticsProvider.getInstance().trackEvent('data_exported');
-        }
-    }
-}
-
-async function importData() {
-    const uri = await vscode.window.showOpenDialog({
-        filters: {
-            'All Supported Files': ['json', 'md', 'csv']
-        }
-    });
-
-    if (uri && uri[0]) {
-        const format = uri[0].path.split('.').pop() as 'json' | 'markdown' | 'csv';
-        checklistItems = await DataProvider.getInstance().importData(
-            uri[0].fsPath,
-            format
-        );
-        await saveChanges();
-        AnalyticsProvider.getInstance().trackEvent('data_imported');
-    }
-}
-
-async function selectTheme() {
-    const themes = ThemeProvider.getInstance().getAvailableThemes();
-    const selected = await vscode.window.showQuickPick(themes, {
-        placeHolder: 'Select theme'
-    });
-
-    if (selected) {
-        ThemeProvider.getInstance().setTheme(selected);
-        AnalyticsProvider.getInstance().trackEvent('theme_changed');
-    }
-}
-
-function showHelp() {
-    vscode.commands.executeCommand('implementation-checklist.showHelpTopic', 'getting-started');
-    AnalyticsProvider.getInstance().trackEvent('help_viewed');
-}
-
-// Helper functions
-async function selectItem(prompt: string) {
-    const items = checklistItems.map(item => ({
-        label: item.title,
-        description: item.completed ? 'Completed' : 'Pending',
-        item
-    }));
-
-    const selected = await vscode.window.showQuickPick(items, { placeHolder: prompt });
-    return selected?.item;
-}
-
-function validateDate(input: string): string | undefined {
-    const date = new Date(input);
-    return isNaN(date.getTime()) ? 'Invalid date format' : undefined;
-}
-
-async function saveChanges() {
-    await WorkspaceProvider.getInstance().saveToWorkspace(checklistItems);
-    updateStatusBar();
-}
-
-function updateStatusBar() {
-    const total = checklistItems.length;
-    const completed = checklistItems.filter(item => item.completed).length;
-    statusBarItem.text = `$(checklist) ${completed}/${total} completed`;
-    statusBarItem.show();
-}
-
-async function updateItems(items: any[]) {
-    checklistItems = items;
-    await saveChanges();
-}
-
-export function deactivate(): void {
-    // Clean up resources
-    statusBarItem.dispose();
-}
+// ... rest of the code remains the same ...

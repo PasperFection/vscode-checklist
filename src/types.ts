@@ -19,6 +19,9 @@ export interface IChecklistItem {
     completedAt?: string;
     parent?: string;
     children?: string[];
+    contextValue?: string;
+    iconPath?: string | vscode.ThemeIcon;
+    command?: vscode.Command;
 }
 
 export interface INote {
@@ -114,6 +117,11 @@ export interface IAnalyticsEvent {
     timestamp: string;
     properties?: { [key: string]: any };
     anonymousId: string;
+    sessionId?: string;
+    workspaceId?: string;
+    extensionVersion?: string;
+    vscodeVersion?: string;
+    platform?: string;
 }
 
 export interface IAnalyticsSummary {
@@ -125,4 +133,13 @@ export interface IAnalyticsSummary {
 
 export interface ITreeItem extends vscode.TreeItem {
     children?: ITreeItem[];
+    item?: IChecklistItem;
+}
+
+export interface ICommandRegistration {
+    command: string;
+    title: string;
+    handler: (...args: any[]) => any;
+    icon?: string;
+    when?: string;
 }

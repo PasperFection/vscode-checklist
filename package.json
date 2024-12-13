@@ -2,7 +2,7 @@
     "name": "vscode-checklist",
     "displayName": "Implementation Checklist",
     "description": "A powerful checklist extension for tracking implementation tasks with priorities, due dates, and team collaboration",
-    "version": "1.4.0",
+    "version": "1.6.3",
     "publisher": "pasperfection",
     "engines": {
         "vscode": "^1.60.0"
@@ -11,270 +11,263 @@
         "Other"
     ],
     "activationEvents": [
-        "onStartupFinished"
+        "onStartupFinished",
+        "onView:implementationChecklist"
     ],
     "main": "./out/extension.js",
+    "icon": "resources/checklist.svg",
     "contributes": {
+        "viewsContainers": {
+            "activitybar": [
+                {
+                    "id": "implementation-checklist",
+                    "title": "Implementation Checklist",
+                    "icon": "resources/checklist.svg"
+                }
+            ]
+        },
+        "views": {
+            "implementation-checklist": [
+                {
+                    "id": "implementationChecklist",
+                    "name": "Implementation Checklist",
+                    "icon": "resources/checklist.svg",
+                    "contextualTitle": "Implementation Checklist",
+                    "type": "tree",
+                    "visibility": "visible"
+                }
+            ]
+        },
         "commands": [
             {
+                "command": "implementation-checklist.scanWorkspace",
+                "title": "Scan Workspace",
+                "icon": "$(search)",
+                "category": "Implementation Checklist"
+            },
+            {
+                "command": "implementation-checklist.refreshView",
+                "title": "Refresh View",
+                "icon": "$(refresh)",
+                "category": "Implementation Checklist"
+            },
+            {
                 "command": "implementation-checklist.createItem",
-                "title": "Implementation Checklist: Create New Item"
+                "title": "Create New Item",
+                "icon": "$(add)",
+                "category": "Implementation Checklist"
             },
             {
                 "command": "implementation-checklist.editItem",
-                "title": "Implementation Checklist: Edit Item"
+                "title": "Edit Item",
+                "icon": "$(edit)",
+                "category": "Implementation Checklist"
             },
             {
                 "command": "implementation-checklist.deleteItem",
-                "title": "Implementation Checklist: Delete Item"
+                "title": "Delete Item",
+                "icon": "$(trash)",
+                "category": "Implementation Checklist"
             },
             {
                 "command": "implementation-checklist.toggleComplete",
-                "title": "Implementation Checklist: Toggle Item Complete"
+                "title": "Toggle Complete",
+                "icon": "$(check)",
+                "category": "Implementation Checklist"
             },
             {
                 "command": "implementation-checklist.setPriority",
-                "title": "Implementation Checklist: Set Item Priority"
+                "title": "Set Priority",
+                "icon": "$(alert)",
+                "category": "Implementation Checklist"
             },
             {
                 "command": "implementation-checklist.setDueDate",
-                "title": "Implementation Checklist: Set Due Date"
+                "title": "Set Due Date",
+                "icon": "$(calendar)",
+                "category": "Implementation Checklist"
             },
             {
                 "command": "implementation-checklist.addNote",
-                "title": "Implementation Checklist: Add Note"
+                "title": "Add Note",
+                "icon": "$(note)",
+                "category": "Implementation Checklist"
             },
             {
                 "command": "implementation-checklist.addTag",
-                "title": "Implementation Checklist: Add Tag"
+                "title": "Add Tag",
+                "icon": "$(tag)",
+                "category": "Implementation Checklist"
             },
             {
                 "command": "implementation-checklist.showStatistics",
-                "title": "Implementation Checklist: Show Statistics"
+                "title": "Show Statistics",
+                "icon": "$(graph)",
+                "category": "Implementation Checklist"
             },
             {
                 "command": "implementation-checklist.filterItems",
-                "title": "Implementation Checklist: Filter Items"
+                "title": "Filter Items",
+                "icon": "$(filter)",
+                "category": "Implementation Checklist"
             },
             {
                 "command": "implementation-checklist.sortItems",
-                "title": "Implementation Checklist: Sort Items"
-            },
-            {
-                "command": "implementation-checklist.searchItems",
-                "title": "Implementation Checklist: Search Items"
-            },
-            {
-                "command": "implementation-checklist.syncWorkspace",
-                "title": "Implementation Checklist: Sync with Workspace"
-            },
-            {
-                "command": "implementation-checklist.syncWithRemote",
-                "title": "Implementation Checklist: Sync with Remote"
-            },
-            {
-                "command": "implementation-checklist.createBackup",
-                "title": "Implementation Checklist: Create Backup"
-            },
-            {
-                "command": "implementation-checklist.restoreBackup",
-                "title": "Implementation Checklist: Restore from Backup"
-            },
-            {
-                "command": "implementation-checklist.exportBackups",
-                "title": "Implementation Checklist: Export Backups"
-            },
-            {
-                "command": "implementation-checklist.importBackups",
-                "title": "Implementation Checklist: Import Backups"
-            },
-            {
-                "command": "implementation-checklist.exportData",
-                "title": "Implementation Checklist: Export Data"
-            },
-            {
-                "command": "implementation-checklist.importData",
-                "title": "Implementation Checklist: Import Data"
+                "title": "Sort Items",
+                "icon": "$(sort-precedence)",
+                "category": "Implementation Checklist"
             },
             {
                 "command": "implementation-checklist.selectTheme",
-                "title": "Implementation Checklist: Select Theme"
-            },
-            {
-                "command": "implementation-checklist.showHelp",
-                "title": "Implementation Checklist: Show Help"
-            },
-            {
-                "command": "implementation-checklist.quickAdd",
-                "title": "Implementation Checklist: Quick Add Item",
-                "icon": "$(add)"
-            },
-            {
-                "command": "implementation-checklist.quickFind",
-                "title": "Implementation Checklist: Quick Find Item",
-                "icon": "$(search)"
-            },
-            {
-                "command": "implementation-checklist.quickFilter",
-                "title": "Implementation Checklist: Quick Filter Items",
-                "icon": "$(filter)"
-            },
-            {
-                "command": "implementation-checklist.quickStats",
-                "title": "Implementation Checklist: Quick Statistics",
-                "icon": "$(graph)"
-            }
-        ],
-        "configuration": {
-            "title": "Implementation Checklist",
-            "properties": {
-                "implementation-checklist.enableNotifications": {
-                    "type": "boolean",
-                    "default": true,
-                    "description": "Enable notifications for due dates and updates"
-                },
-                "implementation-checklist.autoBackup": {
-                    "type": "boolean",
-                    "default": true,
-                    "description": "Automatically create daily backups"
-                },
-                "implementation-checklist.theme": {
-                    "type": "string",
-                    "default": "default",
-                    "enum": ["default", "modern-dark", "modern-light", "ocean-dark"],
-                    "description": "Select the theme for the checklist"
-                },
-                "implementation-checklist.enableAnalytics": {
-                    "type": "boolean",
-                    "default": true,
-                    "description": "Enable anonymous usage analytics to help improve the extension"
-                },
-                "implementation-checklist.syncOnSave": {
-                    "type": "boolean",
-                    "default": true,
-                    "description": "Automatically sync with workspace on save"
-                }
-            }
-        },
-        "keybindings": [
-            {
-                "command": "implementation-checklist.createItem",
-                "key": "ctrl+shift+i",
-                "mac": "cmd+shift+i"
-            },
-            {
-                "command": "implementation-checklist.toggleComplete",
-                "key": "ctrl+shift+c",
-                "mac": "cmd+shift+c"
-            },
-            {
-                "command": "implementation-checklist.searchItems",
-                "key": "ctrl+shift+f",
-                "mac": "cmd+shift+f"
-            },
-            {
-                "command": "implementation-checklist.quickAdd",
-                "key": "ctrl+shift+a",
-                "mac": "cmd+shift+a",
-                "when": "implementation-checklist:enabled"
-            },
-            {
-                "command": "implementation-checklist.quickFind",
-                "key": "ctrl+shift+f",
-                "mac": "cmd+shift+f",
-                "when": "implementation-checklist:enabled"
-            },
-            {
-                "command": "implementation-checklist.quickFilter",
-                "key": "ctrl+shift+l",
-                "mac": "cmd+shift+l",
-                "when": "implementation-checklist:enabled"
-            },
-            {
-                "command": "implementation-checklist.quickStats",
-                "key": "ctrl+shift+s",
-                "mac": "cmd+shift+s",
-                "when": "implementation-checklist:enabled"
+                "title": "Select Theme",
+                "icon": "$(color-mode)",
+                "category": "Implementation Checklist"
             }
         ],
         "menus": {
-            "editor/context": [
+            "view/title": [
+                {
+                    "command": "implementation-checklist.scanWorkspace",
+                    "when": "view == implementationChecklist",
+                    "group": "navigation@1"
+                },
+                {
+                    "command": "implementation-checklist.refreshView",
+                    "when": "view == implementationChecklist",
+                    "group": "navigation@2"
+                },
                 {
                     "command": "implementation-checklist.createItem",
-                    "group": "implementation-checklist"
+                    "when": "view == implementationChecklist",
+                    "group": "navigation@3"
+                },
+                {
+                    "command": "implementation-checklist.filterItems",
+                    "when": "view == implementationChecklist",
+                    "group": "1_filtering@1"
+                },
+                {
+                    "command": "implementation-checklist.sortItems",
+                    "when": "view == implementationChecklist",
+                    "group": "1_filtering@2"
+                },
+                {
+                    "command": "implementation-checklist.showStatistics",
+                    "when": "view == implementationChecklist",
+                    "group": "2_statistics"
+                }
+            ],
+            "view/item/context": [
+                {
+                    "command": "implementation-checklist.toggleComplete",
+                    "when": "view == implementationChecklist && viewItem",
+                    "group": "inline@1"
                 },
                 {
                     "command": "implementation-checklist.editItem",
-                    "group": "implementation-checklist"
+                    "when": "view == implementationChecklist && viewItem",
+                    "group": "inline@2"
                 },
                 {
-                    "command": "implementation-checklist.toggleComplete",
-                    "group": "implementation-checklist"
+                    "command": "implementation-checklist.deleteItem",
+                    "when": "view == implementationChecklist && viewItem",
+                    "group": "inline@3"
+                },
+                {
+                    "command": "implementation-checklist.setPriority",
+                    "when": "view == implementationChecklist && viewItem",
+                    "group": "1_modification@1"
+                },
+                {
+                    "command": "implementation-checklist.setDueDate",
+                    "when": "view == implementationChecklist && viewItem",
+                    "group": "1_modification@2"
+                },
+                {
+                    "command": "implementation-checklist.addNote",
+                    "when": "view == implementationChecklist && viewItem",
+                    "group": "2_content@1"
+                },
+                {
+                    "command": "implementation-checklist.addTag",
+                    "when": "view == implementationChecklist && viewItem",
+                    "group": "2_content@2"
                 }
             ],
             "commandPalette": [
                 {
-                    "command": "implementation-checklist.createItem"
+                    "command": "implementation-checklist.scanWorkspace",
+                    "when": "workspaceFolderCount > 0"
+                },
+                {
+                    "command": "implementation-checklist.createItem",
+                    "when": "view == implementationChecklist"
                 },
                 {
                     "command": "implementation-checklist.editItem",
-                    "when": "implementation-checklist:hasItems"
+                    "when": "false"
                 },
                 {
                     "command": "implementation-checklist.deleteItem",
-                    "when": "implementation-checklist:hasItems"
+                    "when": "false"
                 },
                 {
                     "command": "implementation-checklist.toggleComplete",
-                    "when": "implementation-checklist:hasItems"
+                    "when": "false"
                 },
                 {
                     "command": "implementation-checklist.setPriority",
-                    "when": "implementation-checklist:hasItems"
+                    "when": "false"
                 },
                 {
                     "command": "implementation-checklist.setDueDate",
-                    "when": "implementation-checklist:hasItems"
+                    "when": "false"
                 },
                 {
-                    "command": "implementation-checklist.quickAdd",
-                    "when": "implementation-checklist:enabled"
+                    "command": "implementation-checklist.addNote",
+                    "when": "false"
                 },
                 {
-                    "command": "implementation-checklist.quickFind",
-                    "when": "implementation-checklist:enabled"
-                },
-                {
-                    "command": "implementation-checklist.quickFilter",
-                    "when": "implementation-checklist:enabled"
-                },
-                {
-                    "command": "implementation-checklist.quickStats",
-                    "when": "implementation-checklist:enabled"
-                }
-            ],
-            "view/title": [
-                {
-                    "command": "implementation-checklist.quickAdd",
-                    "when": "view == implementation-checklist",
-                    "group": "navigation"
-                },
-                {
-                    "command": "implementation-checklist.quickFind",
-                    "when": "view == implementation-checklist",
-                    "group": "navigation"
-                },
-                {
-                    "command": "implementation-checklist.quickFilter",
-                    "when": "view == implementation-checklist",
-                    "group": "navigation"
-                },
-                {
-                    "command": "implementation-checklist.quickStats",
-                    "when": "view == implementation-checklist",
-                    "group": "navigation"
+                    "command": "implementation-checklist.addTag",
+                    "when": "false"
                 }
             ]
+        },
+        "configuration": {
+            "title": "Implementation Checklist",
+            "properties": {
+                "implementation-checklist.scanOnStartup": {
+                    "type": "boolean",
+                    "default": true,
+                    "description": "Automatically scan workspace when VS Code starts"
+                },
+                "implementation-checklist.excludePatterns": {
+                    "type": "array",
+                    "default": ["**/node_modules/**", "**/out/**", "**/dist/**"],
+                    "description": "Glob patterns to exclude from scanning"
+                },
+                "implementation-checklist.supportedLanguages": {
+                    "type": "array",
+                    "default": ["javascript", "typescript", "python", "java", "c", "cpp"],
+                    "description": "Languages to scan for implementation items"
+                },
+                "implementation-checklist.theme": {
+                    "type": "string",
+                    "enum": ["default", "modern-dark", "modern-light", "ocean-dark"],
+                    "default": "default",
+                    "description": "Theme for the implementation checklist"
+                },
+                "implementation-checklist.analytics": {
+                    "type": "boolean",
+                    "default": true,
+                    "description": "Enable anonymous usage analytics to help improve the extension"
+                },
+                "implementation-checklist.notificationLimit": {
+                    "type": "number",
+                    "default": 3,
+                    "description": "Maximum number of notifications to show at once"
+                }
+            }
         }
     },
     "scripts": {
@@ -299,17 +292,6 @@
         "vscode-test": "^1.5.2"
     },
     "dependencies": {
-        "date-fns": "^2.30.0",
-        "csv-parse": "^5.5.0",
-        "csv-stringify": "^6.4.0",
-        "marked": "^9.1.0"
-    },
-    "repository": {
-        "type": "git",
-        "url": "https://github.com/pasperfection/vscode-checklist"
-    },
-    "bugs": {
-        "url": "https://github.com/pasperfection/vscode-checklist/issues"
-    },
-    "license": "MIT"
+        "date-fns": "^2.30.0"
+    }
 }

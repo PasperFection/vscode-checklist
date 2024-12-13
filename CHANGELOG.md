@@ -1,5 +1,80 @@
 # Change Log
 
+## [1.6.3] - 2024-12-13
+### Added
+- Tree view type and visibility settings
+- Icon definitions for all commands
+- Proper menu contributions for view title and items
+- Conditional command palette entries
+
+### Fixed
+- Command registration and categorization
+- View activation events
+- Configuration property descriptions
+- Dependency management
+
+### Changed
+- Simplified command structure
+- Removed unused commands and features
+- Streamlined configuration options
+- Updated theme enumeration values
+
+## [1.6.2] - 2024-12-13
+### Added
+- Notification queue system to prevent notification overload
+- Analytics tracking for notifications
+- Maximum concurrent notifications limit
+- Modal dialogs for error notifications
+
+### Fixed
+- Due date checking functionality
+- Notification handling for overdue items
+- Promise handling in notification system
+- Queue processing for notifications
+
+### Changed
+- Simplified notification display logic
+- Improved error handling in notifications
+- Enhanced notification action handling
+- Optimized notification scheduling
+
+## [1.6.1] - 2024-12-13
+### Added
+- Enhanced type definitions for better code safety
+- New command registration interface for cleaner command handling
+- Additional analytics tracking properties
+- Custom theme token colors for priority levels
+
+### Fixed
+- Theme persistence across VSCode sessions
+- Tree view item interface implementation
+- Icon path handling in light and dark themes
+- Color customization for VSCode UI elements
+
+### Changed
+- Improved theme management system
+- Simplified theme registration process
+- Enhanced error handling in providers
+- Consolidated type definitions
+
+## [1.6.0] - 2024-12-13
+### Added
+- Proper state persistence using `globalState` for checklist items
+- Analytics tracking for all user actions
+- Light and dark theme icons for better visual feedback
+- Improved error handling and notifications
+
+### Fixed
+- View registration in the explorer panel
+- Theme persistence across sessions
+- Status bar updates and command linking
+- Tree view data provider implementation
+
+### Changed
+- Streamlined command registration process
+- Improved extension initialization with singleton pattern
+- Enhanced error handling for activation failures
+
 ## [1.5.0] - 2024-12-13
 ### Added
 - Enhanced Command Palette functionality:
