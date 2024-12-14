@@ -22,7 +22,7 @@
                 {
                     "id": "implementation-checklist",
                     "title": "Implementation Checklist",
-                    "icon": "resources/checklist.svg"
+                    "icon": "resources/checklist-icon.svg"
                 }
             ]
         },
@@ -292,6 +292,7 @@
         "vscode-test": "^1.5.2"
     },
     "dependencies": {
-        "date-fns": "^2.30.0"
+        "date-fns": "^2.30.0",
+        "vscode": "^1.60.0"
     }
 }
